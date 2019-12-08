@@ -39,7 +39,7 @@ class Resampler {
         bool _initialized=false;  
         
         double _stepAdaptedOld;
-        double _settledThrs = 1e-12;
+        double _settledThrs = 1e-12/AUDIO_SAMPLE_RATE_EXACT;    
         double _step;
         double _amplitude;
         double _stepTransission[AUDIO_BLOCK_SAMPLES];

@@ -346,11 +346,21 @@ bool Resampler::addToSampleDiff(double diff){
 
     _amplitude=correction-_oldCorrection;
     bool settled=false;
-    if (abs(_oldDiff-diff)*_pControlParam <_settledThrs){
+    if (abs(_oldDiff-diff)*_pControlParam/(_stepAdaptedOld*AUDIO_SAMPLE_RATE_EXACT) <_settledThrs){
         _step+=_oldCorrection;
         _oldCorrection=0.;
         settled=true;
+
+// #ifdef DEBUG_RESAMPLER
+//         Serial.println(_amplitude/(_stepAdaptedOld*AUDIO_SAMPLE_RATE_EXACT)*1e12);
+// #endif
     }
+
+#ifdef DEBUG_RESAMPLER
+    if (abs(_amplitude)/(_stepAdaptedOld*AUDIO_SAMPLE_RATE_EXACT)*1e12 >1.){
+        Serial.println("jitter");
+    }
+#endif
     _oldDiff=diff;
     _stepTransissionCounter=0;
     _stepAdaptedOld=_step+_oldCorrection;
