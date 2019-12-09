@@ -1,7 +1,6 @@
 
 #include "output_spdif3.h"
 #include "input_spdif.h"
-#include "spdifConfig.h"
 #include <Audio.h>
 #include <SerialFlash.h>
 

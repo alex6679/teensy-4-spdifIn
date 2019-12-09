@@ -17,8 +17,8 @@ public:
 	AudioInputSPDIF(void) : AudioStream(0, NULL) { begin(); }
 	virtual void update(void);
 	void begin(void);
-	float getNoBufferedSamples() const;
-	static double getFrequ();
+	double getBufferedTime() const;
+	static double getInputFrequ();
 protected:	
 	static DMAChannel dma;
 	static void isr(void);
@@ -43,7 +43,7 @@ private:
 	static BiQuad bufferLPFilter;
 	static Quantizer quantizer[2];
 
-	static volatile double samplesInBuffer;
+	static volatile double bufferedTime;
 	static volatile uint32_t inputFrequOld;
 	static double inputFrequency;
 	static double targetLatencyS;	//target latency [seconds]

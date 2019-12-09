@@ -5,8 +5,6 @@
 #include "Arduino.h"
 #include "AudioStream.h"        //needed for AUDIO_BLOCK_SAMPLES
 
-//#define DEBUG_RESAMPLER
-
 #define MAX_FILTER_SAMPLES 40961 //=1024*20 +1
 #define NO_EXACT_KAISER_SAMPLES 1025
 #define MAX_HALF_FILTER_LENGTH 80

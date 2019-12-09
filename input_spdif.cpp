@@ -20,7 +20,7 @@ Resampler AudioInputSPDIF::resampler;
 BiQuad AudioInputSPDIF::bufferLPFilter;
 Quantizer AudioInputSPDIF::quantizer[2];
 
-volatile double AudioInputSPDIF::samplesInBuffer;
+volatile double AudioInputSPDIF::bufferedTime;
 double AudioInputSPDIF::inputFrequency=1.;
 volatile uint32_t AudioInputSPDIF::inputFrequOld=0;
 volatile bool AudioInputSPDIF::firstHalfProcessed=false;
@@ -177,10 +177,9 @@ void AudioInputSPDIF::isr(void)
 	}
 #endif
 }
-double AudioInputSPDIF::getFrequ(){
+double AudioInputSPDIF::getInputFrequ(){
 	//page 2129: FrequMeas[23:0]=FreqMeas_CLK / BUS_CLK * 2^10 * GAIN
 	if (SPDIF_SRPC & SPDIF_SRPC_LOCK){
-		//BUS clock: page 1106 and following
 		const uint32_t freqMeas=(SPDIF_SRFM & 0xFFFFFF);
 		if (inputFrequOld != freqMeas){//frequency not stable yet;
 			inputFrequOld=freqMeas;
@@ -211,9 +210,9 @@ void AudioInputSPDIF::allocateBlocks(){
 	}
 }
 
-float AudioInputSPDIF::getNoBufferedSamples() const{
+double AudioInputSPDIF::getBufferedTime() const{
 	__disable_irq();
-	float n=samplesInBuffer;
+	double n=bufferedTime;
 	__enable_irq();
 	return n;
 }
@@ -246,7 +245,7 @@ void AudioInputSPDIF::configure(){
 	}
 #endif
 	if (lc || !resampler.initialized()){
-		const double inputF=getFrequ();	//returns: -1 ... invalid frequency
+		const double inputF=getInputFrequ();	//returns: -1 ... invalid frequency
 		if (inputF > 0.){
 			__disable_irq();
 			lockChanged=false;	//only reset lockChanged if a valid frequency was received (inputFrequ > 0.)
@@ -328,7 +327,7 @@ void AudioInputSPDIF::monitorResampleBuffer(){
 		Serial.println("step settled + latency fixed");
 #endif
 	}
-	samplesInBuffer=(targetLatencyS+diff)*1e6;
+	bufferedTime=targetLatencyS+diff;
 }
 
 void AudioInputSPDIF::update(void)
