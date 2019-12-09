@@ -132,21 +132,14 @@ void Resampler::configure(float fs, float newFs){
         _halfFilterLength=minHalfLength;
     }
     else{
-        cutOffFrequ=(0.5*newFs+20000)/fs;
-        double b=(0.5*newFs-20000)/fs;
+        cutOffFrequ=newFs/fs;
+        double b=2.*(0.5*newFs-20000)/fs;   //this transition band width causes aliasing. However the generated frequencies are above 20kHz
         double attenuation;
 #ifdef DEBUG_RESAMPLER
         Serial.print("b: ");
         Serial.println(b);
 #endif
-        //ToDo find a better solution? Maybe a more efficient anti-aliasing filter?
-        if (fs < 49000){
-            // if the sampling frequency is basicall 48kHz, not much attenuation is needed. Frequency higher than 22,05kHz should already be attenuated
-            attenuation=40;
-        }
-        else {
-            attenuation=100;
-        }
+        attenuation=100;    //100db 
         double hfl=(int32_t)((attenuation-8)/(2.*2.285*TWO_PI*b)+0.5);
         if (hfl >= minHalfLength && hfl <= MAX_HALF_FILTER_LENGTH){
             _halfFilterLength=hfl;
