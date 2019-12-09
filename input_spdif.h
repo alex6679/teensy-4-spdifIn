@@ -9,7 +9,7 @@
 #include "DMAChannel.h"
 #include "BiQuad.h"
 
-//#define DEBUG_SPDIF_IN
+//#define DEBUG_SPDIF_IN	//activates debug output
 
 class AudioInputSPDIF : public AudioStream
 {

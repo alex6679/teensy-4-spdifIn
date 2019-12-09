@@ -1,7 +1,5 @@
 
 #include "output_spdif3.h"
-//#define DEBUG_RESAMPLER	//activates more debug output
-//#define DEBUG_SPDIF_IN
 #include "input_spdif.h"
 #include <Audio.h>
 #include <SerialFlash.h>
