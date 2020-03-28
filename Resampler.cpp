@@ -1,10 +1,11 @@
 #include "Resampler.h"
 #include <math.h>
 
-void Resampler::init(){
+Resampler::Resampler(StepAdaptionParameters settings){
 #ifdef DEBUG_RESAMPLER
 	while (!Serial);
 #endif
+    _settings=settings;
     kaiserWindowSamples[0]=1.;
     double step=1./(NO_EXACT_KAISER_SAMPLES-1);
     double* xSq=kaiserWindowXsq;
@@ -12,12 +13,6 @@ void Resampler::init(){
         double x=(double)i*step;
         *xSq++=(1.-x*x);
     }
-    for (uint16_t i = 1; i< AUDIO_BLOCK_SAMPLES; i++){
-        _stepTransission[i]=0.5-0.5*cos(M_PI*(double)i/AUDIO_BLOCK_SAMPLES);
-    }
-    _stepTransission[AUDIO_BLOCK_SAMPLES-1]=1.;
-    _stepTransissionCounter =AUDIO_BLOCK_SAMPLES;
-    _amplitude=0;
 }
 void Resampler::getKaiserExact(float beta){
     const double thres=1e-10;   
@@ -103,37 +98,38 @@ void Resampler::setFilter(int32_t halfFiltLength,int32_t overSampling, float cut
 }
 
 double Resampler::getStep() const {
-    return _step;
+    return  _stepAdapted;
 }
-
+void Resampler::reset(){
+    _initialized=false;
+}
 void Resampler::configure(float fs, float newFs){
+    // Serial.print("configure, fs: ");
+    // Serial.println(fs);
     if (fs<=0. || newFs <=0.){
         _initialized=false;
         return;
     }
     _step=(double)fs/newFs;
-    _stepAdaptedOld=_step;
-    _stepTransissionCounter =AUDIO_BLOCK_SAMPLES;
-    _amplitude=0;
-    _oldCorrection=0;
-    _oldDiff=0;
-    float* b =_buffer0;
-    for (uint8_t i =0; i< MAX_HALF_FILTER_LENGTH * 2; i++){
-        *b=0.;
-        ++b;
+    _configuredStep=_step;
+    _stepAdapted=_step;
+    _sum=0.;
+    _oldDiffs[0]=0.;
+    _oldDiffs[1]=0.;
+    for (uint8_t i =0; i< MAX_NO_CHANNELS; i++){
+        memset(_buffer[i], 0, sizeof(float)*MAX_HALF_FILTER_LENGTH*2);
     }
 
     float cutOffFrequ, kaiserBeta;
-    const int32_t minHalfLength=20;
     _overSamplingFactor=1024;
     if (fs <= newFs){
         cutOffFrequ=1.;
         kaiserBeta=10;
-        _halfFilterLength=minHalfLength;
+        _halfFilterLength=MIN_HALF_FILTER_LENGTH;
     }
     else{
         cutOffFrequ=newFs/fs;
-        double b=2.*(0.5*newFs-20000)/fs;   //this transition band width causes aliasing. However the generated frequencies are above 20kHz
+        double b=max(0.08,2.*(0.5*newFs-20000)/fs);   //this transition band width causes aliasing. However the generated frequencies are above 20kHz
         double attenuation;
 #ifdef DEBUG_RESAMPLER
         Serial.print("b: ");
@@ -141,14 +137,14 @@ void Resampler::configure(float fs, float newFs){
 #endif
         attenuation=100;    //100db 
         double hfl=(int32_t)((attenuation-8)/(2.*2.285*TWO_PI*b)+0.5);
-        if (hfl >= minHalfLength && hfl <= MAX_HALF_FILTER_LENGTH){
+        if (hfl >= MIN_HALF_FILTER_LENGTH && hfl <= MAX_HALF_FILTER_LENGTH){
             _halfFilterLength=hfl;
 #ifdef DEBUG_RESAMPLER
             Serial.print("Attenuation: ");
 #endif
         }
-        else if (hfl < minHalfLength){
-            _halfFilterLength=minHalfLength;
+        else if (hfl < MIN_HALF_FILTER_LENGTH){
+            _halfFilterLength=MIN_HALF_FILTER_LENGTH;
             attenuation=((2*_halfFilterLength+1)-1)*(2.285*TWO_PI*b)+8;            
 #ifdef DEBUG_RESAMPLER
             Serial.println("Resmapler: sinc filter length increased");
@@ -199,7 +195,9 @@ void Resampler::configure(float fs, float newFs){
 #endif
     setFilter(_halfFilterLength, _overSamplingFactor, cutOffFrequ, kaiserBeta);
     _filterLength=_halfFilterLength*2;
-    _endOfBuffer=&_buffer0[_filterLength];
+    for (uint8_t i =0; i< MAX_NO_CHANNELS; i++){
+        _endOfBuffer[i]=&_buffer[i][_filterLength];
+    }
     _cPos=-_halfFilterLength;   //marks the current center position of the filter
     _initialized=true;
 }
@@ -209,18 +207,15 @@ bool Resampler::initialized() const {
 
 void Resampler::resample(float* input0, float* input1, uint16_t inputLength, uint16_t& processedLength, float* output0, float* output1,uint16_t outputLength, uint16_t& outputCount) {
     outputCount=0;
-    double stepAdapted;
-    if(_stepTransissionCounter >= AUDIO_BLOCK_SAMPLES){
-        stepAdapted=_stepAdaptedOld+_amplitude;
-    }
     int32_t successorIndex=(int32_t)(ceil(_cPos));  //negative number -> currently the _buffer0 of the last iteration is used
     float* ip0, *ip1, *fPtr;
+    float filterC;
+    float si0[2];
+    float si1[2];
     while (floor(_cPos + _halfFilterLength) < inputLength && outputCount < outputLength){
         float dist=successorIndex-_cPos;
             
-        float si0[]={0,0};
-        float si1[]={0,0};
-        float distScaled=dist*_overSamplingFactor;
+        const float distScaled=dist*_overSamplingFactor;
         int32_t rightIndex=abs((int32_t)(ceil(distScaled))-_overSamplingFactor*_halfFilterLength);   
         const int32_t indexData=successorIndex-_halfFilterLength;
         if (indexData>=0){
@@ -228,46 +223,47 @@ void Resampler::resample(float* input0, float* input1, uint16_t inputLength, uin
             ip1=input1+indexData;
         }  
         else {
-            ip0=_buffer0+indexData+_filterLength; 
-            ip1=_buffer1+indexData+_filterLength; 
+            ip0=_buffer[0]+indexData+_filterLength; 
+            ip1=_buffer[1]+indexData+_filterLength; 
         }       
         fPtr=filter+rightIndex;
         if (rightIndex==_overSamplingFactor*_halfFilterLength){
-            si1[0]+=*ip0++**fPtr;
-            si1[1]+=*ip1++**fPtr;   
+            si1[0]=*ip0++**fPtr;
+            si1[1]=*ip1++**fPtr;
+            memset(si0, 0, 2*sizeof(float));   
             fPtr-=_overSamplingFactor;          
             rightIndex=(int32_t)(ceil(distScaled))+_overSamplingFactor;     //needed below  
         }
         else {
+            memset(si0, 0, 2*sizeof(float));
+            memset(si1, 0, 2*sizeof(float));
             rightIndex=(int32_t)(ceil(distScaled));     //needed below
         }
         for (uint16_t i =0 ; i<_halfFilterLength; i++){
-            if(ip0==_endOfBuffer){
+            if(ip0==_endOfBuffer[0]){
                 ip0=input0;
                 ip1=input1;
             }
             si1[0]+=*ip0**fPtr;            
             si1[1]+=*ip1**fPtr;
-            ++fPtr;
-            si0[0]+=*ip0**fPtr;
-            si0[1]+=*ip1**fPtr;       
-            --fPtr;    
+            filterC=*(fPtr+1);
+            si0[0]+=*ip0*filterC;
+            si0[1]+=*ip1*filterC;     
             fPtr-=_overSamplingFactor;      
             ++ip0;
             ++ip1;
         }
         fPtr=filter+rightIndex-1;
         for (uint16_t i =0 ; i<_halfFilterLength; i++){  
-            if(ip0==_endOfBuffer){
+            if(ip0==_endOfBuffer[0]){
                 ip0=input0;
                 ip1=input1;
             }
             si0[0]+=*ip0**fPtr;
             si0[1]+=*ip1**fPtr;
-            ++fPtr;
-            si1[0]+=*ip0**fPtr;            
-            si1[1]+=*ip1**fPtr;
-            --fPtr;
+            filterC=*(fPtr+1);
+            si1[0]+=*ip0*filterC;            
+            si1[1]+=*ip1*filterC;
             fPtr+=_overSamplingFactor;
             ++ip0;
             ++ip1;
@@ -279,11 +275,7 @@ void Resampler::resample(float* input0, float* input1, uint16_t inputLength, uin
 
         outputCount++;
 
-        if(_stepTransissionCounter < AUDIO_BLOCK_SAMPLES){
-            stepAdapted=_stepAdaptedOld+_amplitude*_stepTransission[_stepTransissionCounter];
-            _stepTransissionCounter++;
-        }
-        _cPos+=stepAdapted;
+        _cPos+=_stepAdapted;
         while (_cPos >successorIndex){
             successorIndex++;
         }
@@ -301,16 +293,16 @@ void Resampler::resample(float* input0, float* input1, uint16_t inputLength, uin
         ip0=input0+indexData;
         ip1=input1+indexData;
         const unsigned long long bytesToCopy= _filterLength*sizeof(float);
-        memcpy((void *)_buffer0, (void *)ip0, bytesToCopy);
-        memcpy((void *)_buffer1, (void *)ip1, bytesToCopy);    
+        memcpy((void *)_buffer[0], (void *)ip0, bytesToCopy);
+        memcpy((void *)_buffer[1], (void *)ip1, bytesToCopy);    
     }  
     else {
-        float* b0=_buffer0;
-        float* b1=_buffer1;
-        ip0=_buffer0+indexData+_filterLength; 
-        ip1=_buffer1+indexData+_filterLength;
+        float* b0=_buffer[0];
+        float* b1=_buffer[1];
+        ip0=_buffer[0]+indexData+_filterLength; 
+        ip1=_buffer[1]+indexData+_filterLength;
         for (uint16_t i =0; i< _filterLength; i++){
-            if(ip0==_endOfBuffer){
+            if(ip0==_endOfBuffer[0]){
                 ip0=input0;
                 ip1=input1;
             }        
@@ -325,39 +317,42 @@ void Resampler::resample(float* input0, float* input1, uint16_t inputLength, uin
 }
 
 void Resampler::fixStep(){
-    _step=_stepAdaptedOld;
-    _oldCorrection=0;
-    _oldDiff=0;
+    if (!_initialized){
+        return;
+    }
+    _step=_stepAdapted;
+    _sum=0.;
+    _oldDiffs[0]=0.;
+    _oldDiffs[1]=0.;
+}
+void Resampler::addToPos(double val){
+    if(val < 0){
+        return;
+    }
+    _cPos+=val;
 }
 
 bool Resampler::addToSampleDiff(double diff){
-    double correction=diff*_pControlParam;
-    if (abs(diff) > 1e-5){
-        //increase correction if the error is still quite large
-        correction = diff > 0 ? correction*diff/1e-5 : (-1.)*correction*diff/1e-5;
+   
+    _oldDiffs[0]=_oldDiffs[1];
+    _oldDiffs[1]=(1.-_settings.alpha)*_oldDiffs[1]+_settings.alpha*diff;
+    const double slope=_oldDiffs[1]-_oldDiffs[0];
+    _sum+=diff;
+    double correction=_settings.kp*diff+_settings.kd*slope+_settings.ki*_sum;
+    
+    const double oldStepAdapted=_stepAdapted;
+    _stepAdapted=_step+correction;
+   
+    if (abs(_stepAdapted/_configuredStep-1.) > _settings.maxAdaption){
+        _initialized=false;
+        return false;
     }
-
-    _amplitude=correction-_oldCorrection;
+   
     bool settled=false;
-    if (abs(_oldDiff-diff)*_pControlParam/(_stepAdaptedOld*AUDIO_SAMPLE_RATE_EXACT) <_settledThrs){
-        _step+=_oldCorrection;
-        _oldCorrection=0.;
+    
+    if ((abs(oldStepAdapted- _stepAdapted)/_stepAdapted < _settledThrs*abs(diff) && abs(diff) > 1.5*1e-6)) {
         settled=true;
-
-// #ifdef DEBUG_RESAMPLER
-//         Serial.println(_amplitude/(_stepAdaptedOld*AUDIO_SAMPLE_RATE_EXACT)*1e12);
-// #endif
     }
-
-#ifdef DEBUG_RESAMPLER
-    if (abs(_amplitude)/(_stepAdaptedOld*AUDIO_SAMPLE_RATE_EXACT)*1e12 >1.){
-        Serial.println("jitter");
-    }
-#endif
-    _oldDiff=diff;
-    _stepTransissionCounter=0;
-    _stepAdaptedOld=_step+_oldCorrection;
-    _oldCorrection=correction;
     return settled;
 }
 

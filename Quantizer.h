@@ -9,24 +9,27 @@
 
 class Quantizer {
 public:
-    Quantizer();
-    void configure(bool noiseShaping, bool dither);
+    ///@param audio_sample_rate currently only 44.1kHz and 48kHz are supported
+    Quantizer(float audio_sample_rate);
+    void configure(bool noiseShaping, bool dither, float factor);
     void quantize(float* input, int16_t* output, uint16_t length);
+    //attention outputInterleaved must have length 2*length
+    void quantize(float* input0, float* input1, int32_t* outputInterleaved, uint16_t length);
+    void reset();
         
 private:
 
 bool _noiseShaping=true;
 bool _dither=true;
-float _fOutputLastIt=0.f;
-float _buffer[NOISE_SHAPE_F_LENGTH]={0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f};
-float* _bPtr=_buffer;
-float* _bufferEnd=&_buffer[NOISE_SHAPE_F_LENGTH];
-float _noiseSFilter[NOISE_SHAPE_F_LENGTH ]={-0.06935825f,  0.52540845f, -1.20537028f,  2.09422811f, -3.2177438f,  4.04852027f, -3.83872701f,  3.30584589f, -2.38682527f};
-//  all coefficients in correct order:
-//      {1.        , -2.38682527,  3.30584589, -3.83872701,  4.04852027,
-//       -3.2177438 ,  2.09422811, -1.20537028,  0.52540845, -0.06935825};
-float _maxVal=powf(2,15)-1.;
-float _minVal=-powf(2,15);
+float _fOutputLastIt0=0.f;
+float _fOutputLastIt1=0.f;
+float _buffer0[NOISE_SHAPE_F_LENGTH];
+float _buffer1[NOISE_SHAPE_F_LENGTH];
+float* _bPtr0=_buffer0;
+float* _bufferEnd0;
+float* _bPtr1=_buffer1;
+float _noiseSFilter[NOISE_SHAPE_F_LENGTH ];
+float _factor;
 
 };
 
