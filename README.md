@@ -18,7 +18,7 @@ no noise-shaping and no dithering
 
 
 no noise-shaping but dithered
-![img2](https://github.com/alex6679/teensy-4-spdifIn/tree/master/imgs/noiseShapingOff_ditherOn.png)
+![img2](https://github.com/alex6679/teensy-4-spdifIn/blob/master/imgs/noiseShapingOff_ditherOn.png)
 
 
 noise-shaping and dithering applied:
