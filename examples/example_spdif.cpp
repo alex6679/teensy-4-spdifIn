@@ -7,7 +7,7 @@
 
 
 AudioOutputSPDIF3   spdifOut;
-AudioInputSPDIF     spdifIn(false, false);	//dither = true, noiseshaping = true
+AudioInputSPDIF     spdifIn(true, true, 100, 20);	//dither = true, noiseshaping = true, anti-aliasing attenuation=100dB, minimum resampling filter length=20
 //
 
 AudioConnection          patchCord1(spdifIn, 0, spdifOut, 0);
@@ -24,14 +24,14 @@ void setup() {
 void loop() {
 	double bufferedTine=spdifIn.getBufferedTime();
 	//double targetLatency = spdifIn.getTargetLantency();
-	//Serial.print("buffered time [micro seconds]: ");
+	Serial.print("buffered time [micro seconds]: ");
 	Serial.println(bufferedTine*1e6,2);
 	// Serial.print(", target: ");
 	// Serial.println(targetLatency*1e6,2);
 	
-	// double pUsageIn=spdifIn.processorUsage(); 
-	// Serial.print("processor usage [%]: ");
-	// Serial.println(pUsageIn);
+	double pUsageIn=spdifIn.processorUsage(); 
+	Serial.print("processor usage [%]: ");
+	Serial.println(pUsageIn);
 
 	// bool islocked=spdifIn.isLocked(); 
 	// Serial.print("isLocked: ");
@@ -42,5 +42,5 @@ void loop() {
 	// Serial.println(f);
 	// Serial.print("Memory max: ");
   	// Serial.println(AudioMemoryUsageMax());
-	delay(3);
+	delay(500);
 }

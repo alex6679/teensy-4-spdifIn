@@ -2,7 +2,8 @@
 #if defined(__IMXRT1052__) || defined(__IMXRT1062__)
 
 #include "input_spdif.h"
-#include "biQuad.h"
+#include "biquad.h"
+#include <utility/imxrt_hw.h>
 //Parameters
 namespace {
 	#define SPDIF_RX_BUFFER_LENGTH AUDIO_BLOCK_SAMPLES
@@ -17,6 +18,7 @@ volatile bool AudioInputSPDIF::bufferOverflow=false;
 
 volatile uint32_t AudioInputSPDIF::microsLast;
 
+DMAMEM __attribute__((aligned(32)))
 static int32_t spdif_rx_buffer[SPDIF_RX_BUFFER_LENGTH];
 static float bufferR[bufferLength];
 static float bufferL[bufferLength];
@@ -36,10 +38,19 @@ AudioInputSPDIF::~AudioInputSPDIF(){
 }
 
 PROGMEM
-void AudioInputSPDIF::begin(void)
-{
+AudioInputSPDIF::AudioInputSPDIF(bool dither, bool noiseshaping,float attenuation, int32_t minHalfFilterLength) : AudioStream(0, NULL) {
+	_attenuation=attenuation;
+	_minHalfFilterLength=minHalfFilterLength;
+	const float factor = powf(2, 15)-1.f; // to 16 bit audio
 	quantizer[0]=new Quantizer(AUDIO_SAMPLE_RATE_EXACT);
+	quantizer[0]->configure(noiseshaping, dither, factor);
 	quantizer[1]=new Quantizer(AUDIO_SAMPLE_RATE_EXACT);
+	quantizer[1]->configure(noiseshaping, dither, factor);
+	begin();
+	}
+PROGMEM
+void AudioInputSPDIF::begin()
+{
 	dma.begin(true); // Allocate the DMA channel first
 	const uint32_t noByteMinorLoop=2*4;
 	dma.TCD->SOFF = 4;
@@ -156,6 +167,9 @@ void AudioInputSPDIF::isr(void)
 	}
 	if (buffer_offset >=resample_offset ||
 		(buffer_offset + SPDIF_RX_BUFFER_LENGTH/4) < resample_offset) {
+		#if IMXRT_CACHE_ENABLED >=1
+		arm_dcache_delete((void*)src, sizeof(spdif_rx_buffer) / 2);
+		#endif
 		float *destR = &(bufferR[buffer_offset]);
 		float *destL = &(bufferL[buffer_offset]);
 		const float factor= pow(2., 23.)+1;
@@ -244,7 +258,7 @@ void AudioInputSPDIF::configure(){
 				__disable_irq();
 				resample_offset =  targetLatency <= buffer_offset ? buffer_offset - targetLatency : bufferLength -(targetLatency-buffer_offset);
 				__enable_irq();
-				_resampler.configure(inputF, AUDIO_SAMPLE_RATE_EXACT);
+				_resampler.configure(inputF, AUDIO_SAMPLE_RATE_EXACT, _attenuation, _minHalfFilterLength);
 		#ifdef DEBUG_SPDIF_IN
 				Serial.print("_maxLatency: ");
 				Serial.println(_maxLatency);

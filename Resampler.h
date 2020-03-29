@@ -3,12 +3,11 @@
 
 
 #include "Arduino.h"
-// #define DEBUG_RESAMPLER  //activates debug output
+//#define DEBUG_RESAMPLER  //activates debug output
 
 #define MAX_FILTER_SAMPLES 40961 //=1024*20 +1
 #define NO_EXACT_KAISER_SAMPLES 1025
 #define MAX_HALF_FILTER_LENGTH 80
-#define MIN_HALF_FILTER_LENGTH 20
 #define MAX_NO_CHANNELS 8
 class Resampler {
     public:
@@ -16,14 +15,16 @@ class Resampler {
         struct StepAdaptionParameters {
             StepAdaptionParameters(){}
             double alpha =0.2;  //exponential smoothing parameter
-            double maxAdaption = 0.01; //maximum allowed adaption of resampler step in percent
+            double maxAdaption = 0.01; //maximum relative allowed adaption of resampler step 0.01 = 1%
             double kp= 0.6;
             double ki=0.00012;
             double kd= 1.8;
         };
         Resampler(StepAdaptionParameters settings=StepAdaptionParameters());
         void reset();
-        void configure(float fs, float newFs);
+        ///@param attenuation target attenuation [dB] of the anti-aliasing filter. Only used if newFs<fs. The attenuation can't be reached if the needed filter length exceeds 2*MAX_FILTER_SAMPLES+1
+        ///@param minHalfFilterLength If newFs >= fs, the filter length of the resampling filter is 2*minHalfFilterLength+1. If fs y newFs the filter is maybe longer to reach the desired attenuation
+        void configure(float fs, float newFs, float attenuation=100, int32_t minHalfFilterLength=20);
         ///@param input0 first input array/ channel
         ///@param input1 second input array/ channel
         ///@param inputLength length of each input array
@@ -40,6 +41,7 @@ class Resampler {
         void fixStep();
         bool initialized() const;
         
+        //resampling NOCHANNELS channels. Performance is increased a lot if the number of channels is known at compile time -> the number of channels is a template argument
         template <uint8_t NOCHANNELS>
         inline void resample(float** inputs, uint16_t inputLength, uint16_t& processedLength, float** outputs, uint16_t outputLength, uint16_t& outputCount){
             outputCount=0;

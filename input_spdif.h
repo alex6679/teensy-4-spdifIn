@@ -13,10 +13,12 @@
 class AudioInputSPDIF : public AudioStream
 {
 public:
-	AudioInputSPDIF(void) : AudioStream(0, NULL) { begin(); }
+	///@param attenuation target attenuation [dB] of the anti-aliasing filter. Only used if newFs<fs. The attenuation can't be reached if the needed filter length exceeds 2*MAX_FILTER_SAMPLES+1
+	///@param minHalfFilterLength If newFs >= fs, the filter length of the resampling filter is 2*minHalfFilterLength+1. If fs y newFs the filter is maybe longer to reach the desired attenuation
+	AudioInputSPDIF(bool dither, bool noiseshaping,float attenuation, int32_t minHalfFilterLength);
 	~AudioInputSPDIF();
 	virtual void update(void);
-	void begin(void);
+	void begin();
 	void stop();
 	double getBufferedTime() const;
 	double getInputFrequency() const;
@@ -47,6 +49,8 @@ private:
 	static FrequencyMeasurement frequMeasure;	
 	#endif
 	//=============================
+	float _attenuation;
+	int32_t _minHalfFilterLength;
 	Resampler _resampler;
 	Quantizer* quantizer[2];
 	arm_biquad_cascade_df2T_instance_f32 _bufferLPFilter;

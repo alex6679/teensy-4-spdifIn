@@ -103,7 +103,7 @@ double Resampler::getStep() const {
 void Resampler::reset(){
     _initialized=false;
 }
-void Resampler::configure(float fs, float newFs){
+void Resampler::configure(float fs, float newFs, float attenuation, int32_t minHalfFilterLength){
     // Serial.print("configure, fs: ");
     // Serial.println(fs);
     if (fs<=0. || newFs <=0.){
@@ -125,26 +125,24 @@ void Resampler::configure(float fs, float newFs){
     if (fs <= newFs){
         cutOffFrequ=1.;
         kaiserBeta=10;
-        _halfFilterLength=MIN_HALF_FILTER_LENGTH;
+        _halfFilterLength=minHalfFilterLength;
     }
     else{
         cutOffFrequ=newFs/fs;
-        double b=max(0.08,2.*(0.5*newFs-20000)/fs);   //this transition band width causes aliasing. However the generated frequencies are above 20kHz
-        double attenuation;
+        double b=2.*(0.5*newFs-20000)/fs;   //this transition band width causes aliasing. However the generated frequencies are above 20kHz
 #ifdef DEBUG_RESAMPLER
         Serial.print("b: ");
         Serial.println(b);
 #endif
-        attenuation=100;    //100db 
         double hfl=(int32_t)((attenuation-8)/(2.*2.285*TWO_PI*b)+0.5);
-        if (hfl >= MIN_HALF_FILTER_LENGTH && hfl <= MAX_HALF_FILTER_LENGTH){
+        if (hfl >= minHalfFilterLength && hfl <= MAX_HALF_FILTER_LENGTH){
             _halfFilterLength=hfl;
 #ifdef DEBUG_RESAMPLER
             Serial.print("Attenuation: ");
 #endif
         }
-        else if (hfl < MIN_HALF_FILTER_LENGTH){
-            _halfFilterLength=MIN_HALF_FILTER_LENGTH;
+        else if (hfl < minHalfFilterLength){
+            _halfFilterLength=minHalfFilterLength;
             attenuation=((2*_halfFilterLength+1)-1)*(2.285*TWO_PI*b)+8;            
 #ifdef DEBUG_RESAMPLER
             Serial.println("Resmapler: sinc filter length increased");
@@ -184,8 +182,8 @@ void Resampler::configure(float fs, float newFs){
     Serial.println(fs);
     Serial.print("cutOffFrequ: ");
     Serial.println(cutOffFrequ);
-    Serial.print("_halfFilterLength: ");
-    Serial.println(_halfFilterLength);
+    Serial.print("filter length: ");
+    Serial.println(2*_halfFilterLength+1);
     Serial.print("overSampling: ");
     Serial.println(_overSamplingFactor);
     Serial.print("kaiserBeta: ");
@@ -204,7 +202,6 @@ void Resampler::configure(float fs, float newFs){
 bool Resampler::initialized() const {
     return _initialized;
 }
-
 void Resampler::resample(float* input0, float* input1, uint16_t inputLength, uint16_t& processedLength, float* output0, float* output1,uint16_t outputLength, uint16_t& outputCount) {
     outputCount=0;
     int32_t successorIndex=(int32_t)(ceil(_cPos));  //negative number -> currently the _buffer0 of the last iteration is used
