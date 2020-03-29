@@ -1,13 +1,13 @@
 
 #include "output_spdif3.h"
-#include "input_spdif.h"
+#include "async_input_spdif3.h"
 #include <Audio.h>
 #include <SerialFlash.h>
 
 
 
 AudioOutputSPDIF3   spdifOut;
-AudioInputSPDIF     spdifIn(true, true, 100, 20);	//dither = true, noiseshaping = true, anti-aliasing attenuation=100dB, minimum resampling filter length=20
+AsyncAudioInputSPDIF3     spdifIn(true, true, 100, 20);	//dither = true, noiseshaping = true, anti-aliasing attenuation=100dB, minimum resampling filter length=20
 //
 
 AudioConnection          patchCord1(spdifIn, 0, spdifOut, 0);

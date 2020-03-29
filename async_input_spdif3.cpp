@@ -1,7 +1,7 @@
 
 #if defined(__IMXRT1052__) || defined(__IMXRT1062__)
 
-#include "input_spdif.h"
+#include "async_input_spdif3.h"
 #include "biquad.h"
 #include <utility/imxrt_hw.h>
 //Parameters
@@ -10,27 +10,27 @@ namespace {
 	const int32_t bufferLength=8*AUDIO_BLOCK_SAMPLES;
 	const uint16_t noSamplerPerIsr=SPDIF_RX_BUFFER_LENGTH/4;
 }
-volatile bool AudioInputSPDIF::resetResampler=true;
+volatile bool AsyncAudioInputSPDIF3::resetResampler=true;
 
 #ifdef DEBUG_SPDIF_IN
-volatile bool AudioInputSPDIF::bufferOverflow=false;
+volatile bool AsyncAudioInputSPDIF3::bufferOverflow=false;
 #endif
 
-volatile uint32_t AudioInputSPDIF::microsLast;
+volatile uint32_t AsyncAudioInputSPDIF3::microsLast;
 
 DMAMEM __attribute__((aligned(32)))
 static int32_t spdif_rx_buffer[SPDIF_RX_BUFFER_LENGTH];
 static float bufferR[bufferLength];
 static float bufferL[bufferLength];
 
-volatile int32_t AudioInputSPDIF::buffer_offset = 0;	// read by resample/ written in spdif input isr -> copied at the beginning of 'resmaple' protected by __disable_irq() in resample
-int32_t AudioInputSPDIF::resample_offset = 0; // read/written by resample/ read in spdif input isr -> no protection needed?
+volatile int32_t AsyncAudioInputSPDIF3::buffer_offset = 0;	// read by resample/ written in spdif input isr -> copied at the beginning of 'resmaple' protected by __disable_irq() in resample
+int32_t AsyncAudioInputSPDIF3::resample_offset = 0; // read/written by resample/ read in spdif input isr -> no protection needed?
 
-volatile bool AudioInputSPDIF::lockChanged=false;
-volatile bool AudioInputSPDIF::locked=false;
-DMAChannel AudioInputSPDIF::dma(false);
+volatile bool AsyncAudioInputSPDIF3::lockChanged=false;
+volatile bool AsyncAudioInputSPDIF3::locked=false;
+DMAChannel AsyncAudioInputSPDIF3::dma(false);
 
-AudioInputSPDIF::~AudioInputSPDIF(){
+AsyncAudioInputSPDIF3::~AsyncAudioInputSPDIF3(){
 	delete [] _bufferLPFilter.pCoeffs;
 	delete [] _bufferLPFilter.pState;
 	delete quantizer[0];
@@ -38,7 +38,7 @@ AudioInputSPDIF::~AudioInputSPDIF(){
 }
 
 PROGMEM
-AudioInputSPDIF::AudioInputSPDIF(bool dither, bool noiseshaping,float attenuation, int32_t minHalfFilterLength) : AudioStream(0, NULL) {
+AsyncAudioInputSPDIF3::AsyncAudioInputSPDIF3(bool dither, bool noiseshaping,float attenuation, int32_t minHalfFilterLength) : AudioStream(0, NULL) {
 	_attenuation=attenuation;
 	_minHalfFilterLength=minHalfFilterLength;
 	const float factor = powf(2, 15)-1.f; // to 16 bit audio
@@ -49,7 +49,7 @@ AudioInputSPDIF::AudioInputSPDIF(bool dither, bool noiseshaping,float attenuatio
 	begin();
 	}
 PROGMEM
-void AudioInputSPDIF::begin()
+void AsyncAudioInputSPDIF3::begin()
 {
 	dma.begin(true); // Allocate the DMA channel first
 	const uint32_t noByteMinorLoop=2*4;
@@ -79,13 +79,13 @@ void AudioInputSPDIF::begin()
 	_bufferLPFilter.pState=new float[2];
 	getCoefficients(_bufferLPFilter.pCoeffs, BiquadType::LOW_PASS, 0., 5., AUDIO_SAMPLE_RATE_EXACT/AUDIO_BLOCK_SAMPLES, 0.5);
 }
-bool AudioInputSPDIF::isLocked() const {
+bool AsyncAudioInputSPDIF3::isLocked() const {
 	__disable_irq();
 	bool l=locked;
 	__enable_irq();
 	return l;
 }
-void AudioInputSPDIF::spdif_interrupt(){
+void AsyncAudioInputSPDIF3::spdif_interrupt(){
 	if(SPDIF_SIS & SPDIF_SIS_LOCK){
 		if (!locked){
 			locked=true;
@@ -103,7 +103,7 @@ void AudioInputSPDIF::spdif_interrupt(){
 	SPDIF_SIC |= SPDIF_SIC_LOCK;	//clear SPDIF_SIC_LOCK interrupt
 }
 
-void AudioInputSPDIF::resample(int16_t* data_left, int16_t* data_right, int32_t& block_offset){
+void AsyncAudioInputSPDIF3::resample(int16_t* data_left, int16_t* data_right, int32_t& block_offset){
 	block_offset=0;
 	if(!_resampler.initialized()){
 		return;
@@ -146,7 +146,7 @@ void AudioInputSPDIF::resample(int16_t* data_left, int16_t* data_right, int32_t&
 	__enable_irq();		
 }
 
-void AudioInputSPDIF::isr(void)
+void AsyncAudioInputSPDIF3::isr(void)
 {
 	dma.clearInterrupt();
 	microsLast=micros();
@@ -158,7 +158,7 @@ void AudioInputSPDIF::isr(void)
 		// need to remove data from the second half
 		src = (int32_t *)&spdif_rx_buffer[SPDIF_RX_BUFFER_LENGTH/2];
 		end = (int32_t *)&spdif_rx_buffer[SPDIF_RX_BUFFER_LENGTH];
-		//if (AudioInputSPDIF::update_responsibility) AudioStream::update_all();
+		//if (AsyncAudioInputSPDIF3::update_responsibility) AudioStream::update_all();
 	} else {
 		// DMA is receiving to the second half of the buffer
 		// need to remove data from the first half
@@ -190,7 +190,7 @@ void AudioInputSPDIF::isr(void)
 	}
 #endif
 }
-double AudioInputSPDIF::getNewValidInputFrequ(){
+double AsyncAudioInputSPDIF3::getNewValidInputFrequ(){
 	//page 2129: FrequMeas[23:0]=FreqMeas_CLK / BUS_CLK * 2^10 * GAIN
 	if (SPDIF_SRPC & SPDIF_SRPC_LOCK){
 		const double f=(float)F_BUS_ACTUAL/(1024.*1024.*24.*128.);// bit clock = 128 * sampling frequency
@@ -204,14 +204,14 @@ double AudioInputSPDIF::getNewValidInputFrequ(){
 	return -1.;
 }
 
-double AudioInputSPDIF::getBufferedTime() const{
+double AsyncAudioInputSPDIF3::getBufferedTime() const{
 	__disable_irq();
 	double n=_bufferedTime;
 	__enable_irq();
 	return n;
 }
 
-void AudioInputSPDIF::configure(){
+void AsyncAudioInputSPDIF3::configure(){
 	__disable_irq();
 	if(resetResampler){
 		_resampler.reset();
@@ -274,7 +274,7 @@ void AudioInputSPDIF::configure(){
 	}
 }
 
-void AudioInputSPDIF::monitorResampleBuffer(){
+void AsyncAudioInputSPDIF3::monitorResampleBuffer(){
 	if(!_resampler.initialized()){
 		return;
 	}
@@ -334,7 +334,7 @@ void AudioInputSPDIF::monitorResampleBuffer(){
 	_bufferedTime=_targetLatencyS+diff;
 }
 
-void AudioInputSPDIF::update(void)
+void AsyncAudioInputSPDIF3::update(void)
 {
 	configure();
 	monitorResampleBuffer();	//important first call 'monitorResampleBuffer' then 'resample'
@@ -372,19 +372,19 @@ void AudioInputSPDIF::update(void)
 	}
 #endif
 }
-double AudioInputSPDIF::getInputFrequency() const{
+double AsyncAudioInputSPDIF3::getInputFrequency() const{
 	__disable_irq();
 	double f=_lastValidInputFrequ;
 	__enable_irq();
 	return f;
 }
-double AudioInputSPDIF::getTargetLantency() const {
+double AsyncAudioInputSPDIF3::getTargetLantency() const {
 	__disable_irq();
 	double l=_targetLatencyS;
 	__enable_irq();
 	return l ;
 }
-void AudioInputSPDIF::config_spdifIn(){
+void AsyncAudioInputSPDIF3::config_spdifIn(){
 	//CCM Clock Gating Register 5, imxrt1060_rev1.pdf page 1145
 	CCM_CCGR5 |=CCM_CCGR5_SPDIF(CCM_CCGR_ON); //turn spdif clock on - necessary for receiver!
 	

@@ -1,6 +1,6 @@
 
-#ifndef input_spdif_nativ_h_
-#define input_spdif_nativ_h_
+#ifndef async_input_spdif3_h_
+#define async_input_spdif3_h_
 #include "Resampler.h"
 #include "Quantizer.h"
 #include "Arduino.h"
@@ -10,13 +10,13 @@
 
 //#define DEBUG_SPDIF_IN	//activates debug output
 
-class AudioInputSPDIF : public AudioStream
+class AsyncAudioInputSPDIF3 : public AudioStream
 {
 public:
 	///@param attenuation target attenuation [dB] of the anti-aliasing filter. Only used if newFs<fs. The attenuation can't be reached if the needed filter length exceeds 2*MAX_FILTER_SAMPLES+1
 	///@param minHalfFilterLength If newFs >= fs, the filter length of the resampling filter is 2*minHalfFilterLength+1. If fs y newFs the filter is maybe longer to reach the desired attenuation
-	AudioInputSPDIF(bool dither, bool noiseshaping,float attenuation, int32_t minHalfFilterLength);
-	~AudioInputSPDIF();
+	AsyncAudioInputSPDIF3(bool dither, bool noiseshaping,float attenuation, int32_t minHalfFilterLength);
+	~AsyncAudioInputSPDIF3();
 	virtual void update(void);
 	void begin();
 	void stop();
