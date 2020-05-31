@@ -1,3 +1,4 @@
+
 #include "Resampler.h"
 #include <math.h>
 
@@ -100,6 +101,12 @@ void Resampler::setFilter(int32_t halfFiltLength,int32_t overSampling, float cut
 double Resampler::getStep() const {
     return  _stepAdapted;
 }
+double Resampler::getAttenuation() const {
+    return  _attenuation;
+}
+int32_t Resampler::getHalfFilterLength() const{
+	return  _halfFilterLength;
+}
 void Resampler::reset(){
     _initialized=false;
 }
@@ -107,6 +114,7 @@ void Resampler::configure(float fs, float newFs, float attenuation, int32_t minH
     // Serial.print("configure, fs: ");
     // Serial.println(fs);
     if (fs<=0. || newFs <=0.){
+		_attenuation=0;
         _initialized=false;
         return;
     }
@@ -123,9 +131,10 @@ void Resampler::configure(float fs, float newFs, float attenuation, int32_t minH
     float cutOffFrequ, kaiserBeta;
     _overSamplingFactor=1024;
     if (fs <= newFs){
+		_attenuation=0;
         cutOffFrequ=1.;
         kaiserBeta=10;
-        _halfFilterLength=minHalfFilterLength;
+        _halfFilterLength=min(minHalfFilterLength,MAX_HALF_FILTER_LENGTH);
     }
     else{
         cutOffFrequ=newFs/fs;
@@ -175,6 +184,7 @@ void Resampler::configure(float fs, float newFs, float attenuation, int32_t minH
             int32_t f = (noSamples-1)/(MAX_FILTER_SAMPLES-1)+1;
             _overSamplingFactor/=f;
         }
+		_attenuation=attenuation;
     }
 
 #ifdef DEBUG_RESAMPLER

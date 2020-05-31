@@ -1,3 +1,4 @@
+
 #ifndef resampler_h_
 #define resampler_h_
 
@@ -40,6 +41,8 @@ class Resampler {
         void addToPos(double val);
         void fixStep();
         bool initialized() const;
+		double getAttenuation() const;
+		int32_t getHalfFilterLength() const;
         
         //resampling NOCHANNELS channels. Performance is increased a lot if the number of channels is known at compile time -> the number of channels is a template argument
         template <uint8_t NOCHANNELS>
@@ -177,7 +180,7 @@ class Resampler {
         float* _endOfBuffer[MAX_NO_CHANNELS];
 
         int32_t _overSamplingFactor;
-        int32_t _halfFilterLength;
+        int32_t _halfFilterLength=0;
         int32_t _filterLength;     
         bool _initialized=false;  
         
@@ -189,6 +192,8 @@ class Resampler {
         double _cPos;
         double _sum;
         double _oldDiffs[2]; 
+		
+		double _attenuation=0;
 };
 
 #endif
