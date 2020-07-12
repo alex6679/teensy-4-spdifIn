@@ -47,7 +47,6 @@ public:
 	~AsyncAudioInputSPDIF3();
 	virtual void update(void);
 	void begin();
-	void stop();
 	double getBufferedTime() const;
 	double getInputFrequency() const;
 	static bool isLocked();
