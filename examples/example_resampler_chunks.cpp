@@ -43,6 +43,9 @@ void setup() {
     //resampling =========================================
     uint16_t usedInputSamplesCurrentIteration;
     uint16_t computedOutputSamplesCurrentIteration;
+	//This function changes the inner state of the resampler.
+	//The exact position (somerwhere between the samples of the incoming data) of the last interpolated sample is stored, so that the
+	//sequence of interpolated samples can be correctly extended at the next call.
     resampler.resample(
         inputSamples[0] + usedInputSamples,
         inputSamples[1] + usedInputSamples,
