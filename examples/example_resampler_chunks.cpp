@@ -16,7 +16,7 @@ void setup() {
   uint16_t usedInputSamples = noInputSamples; //the buffer should be filled at the first iteration
 
   
-  uint16_t noOutputSamples=128;
+  uint16_t noOutputSamples=128;	// it's not necessary that the input and output buffer have the same length.
   float outputSamples[noChannels][noOutputSamples];
   uint16_t computedOutputSamples = 0;
 
