@@ -1,4 +1,31 @@
-
+/* Audio Library for Teensy 3.X
+ * Copyright (c) 2019, Paul Stoffregen, paul@pjrc.com
+ *
+ * Development of this audio library was funded by PJRC.COM, LLC by sales of
+ * Teensy and Audio Adaptor boards.  Please support PJRC's efforts to develop
+ * open source software by purchasing Teensy or other PJRC products.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice, development funding notice, and this permission
+ * notice shall be included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+/*
+ by Alexander Walch
+ */
 #ifndef biquad_coeffs_h_
 #define biquad_coeffs_h_
 
@@ -116,9 +143,9 @@ void getCoefficients(T* coeffs, BiquadType type, double dbGain, double freq, dou
         if(S->numStages==1){
             BTYPE yn;
             for (uint32_t j=0; j<blockSize; j++ ){
-                yn = *b0 * *pSrc + *state;
-                *state = *b1 * *pSrc + *a1Neg * yn + *(state+1);
-                *(state+1) = *b2 * *pSrc++ + *a2Neg * yn;
+                yn = *b0 * (BTYPE)*pSrc + *state;
+                *state = *b1 * (BTYPE)*pSrc + *a1Neg * yn + *(state+1);
+                *(state+1) = *b2 * (BTYPE)*pSrc++ + *a2Neg * yn;
                 *pDst++=(T)yn;
             }
         }
@@ -127,9 +154,9 @@ void getCoefficients(T* coeffs, BiquadType type, double dbGain, double freq, dou
             BTYPE pDstD[blockSize];
             BTYPE* pDstDP=pDstD;
             for (uint32_t j=0; j<blockSize; j++ ){
-                *pDstDP = *b0 * *pSrc + *state;
-                *state = *b1 * *pSrc + *a1Neg * *pDstDP + *(state+1);
-                *(state+1) = *b2 * *pSrc++ + *a2Neg * *pDstDP++;
+                *pDstDP = *b0 * (BTYPE)*pSrc + *state;
+                *state = *b1 * (BTYPE)*pSrc + *a1Neg * *pDstDP + *(state+1);
+                *(state+1) = *b2 * (BTYPE)*pSrc++ + *a2Neg * *pDstDP++;
             }
             b0+=5;
             b1+=5;
@@ -164,8 +191,8 @@ void getCoefficients(T* coeffs, BiquadType type, double dbGain, double freq, dou
         }
     }	
 
-	template <typename B>
-	void preload(const B*  S, double val=0.){
+	template <typename B, typename BTYPE>
+	void preload(const B*  S, BTYPE val=(BTYPE)0){
         // double* b1=B->pCoeffs+1;
         // double* b2=B->pCoeffs+2;
         // double* a1Neg=B->pCoeffs+3;
