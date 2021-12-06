@@ -20,7 +20,7 @@ void setup() {
   float outputSamples[noChannels][noOutputSamples];
   uint16_t computedOutputSamples = 0;
 
-  // parameters or the resampled signal
+  // parameters of the resampled signal
   double frequ=4000;
   uint32_t x = 0;
   //===================================
